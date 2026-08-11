@@ -55,7 +55,9 @@ jobs:
             STRIP=llvm-strip \
             "$DEFCONFIG"
 
-          ./scripts/config --file out/.config --enable OVERLAY_FS
+           ./scripts/config --file out/.config --enable OVERLAY_FS
+          ./scripts/config --file out/.config --enable KPROBES
+          ./scripts/config --file out/.config --enable EXT4_FS
           ./scripts/config --file out/.config --enable KSU
 
           make O=out ARCH=arm64 \
@@ -64,10 +66,7 @@ jobs:
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
             olddefconfig
-
-          grep -n -A12 '^config KSU' KernelSU-Next/kernel/Kconfig
-          grep -E '^(CONFIG_KSU|CONFIG_OVERLAY_FS|CONFIG_KPROBES|CONFIG_KRETPROBES)=' out/.config || true
-          exit 1
+            grep '^CONFIG_KSU=' out/.config
             
       - name: Compiler le noyau
         run: |
