@@ -54,9 +54,9 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             "$DEFCONFIG"
-
+            
       - name: Compiler le noyau
-         run: | 
+        run: |
           make -j"$(nproc)" O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
