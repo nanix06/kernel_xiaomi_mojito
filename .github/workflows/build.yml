@@ -32,7 +32,8 @@ jobs:
             bc bison build-essential ccache flex git libssl-dev \
             libelf-dev pahole python3 rsync unzip wget zip \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi \
+            clang lld llvm
       - name: Ajouter KernelSU Next
         run: |
           curl -LSs \
@@ -42,11 +43,30 @@ jobs:
       - name: Configurer le noyau
         run: |
           mkdir -p out
-          make O=out ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE" "$DEFCONFIG"
+          make O=out ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
+            CC="clang --target=aarch64-linux-gnu" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            "$DEFCONFIG"
 
       - name: Compiler le noyau
-        run: |
-          make -j"$(nproc)" O=out ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE"
+         run: | 
+          make -j"$(nproc)" O=out ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
+            CC="clang --target=aarch64-linux-gnu" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip
 
       - name: Préparer les fichiers
         run: |
