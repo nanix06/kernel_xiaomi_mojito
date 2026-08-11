@@ -1,0 +1,71 @@
+name: Mojito - KernelSU Next Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  DEFCONFIG: vendor/mojito_defconfig
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Télécharger le source
+        uses: actions/checkout@v4
+        with:
+          ref: inline-rom
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Installer les dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache flex git libssl-dev \
+            libelf-dev pahole python3 rsync unzip wget zip \
+            clang lld
+
+      - name: Ajouter KernelSU Next
+        run: |
+          curl -LSs \
+            "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" \
+            | bash -s next
+
+      - name: Configurer le noyau
+        run: |
+          mkdir -p out
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 "$DEFCONFIG"
+
+      - name: Compiler le noyau
+        run: |
+          make -j"$(nproc)" O=out ARCH=arm64 \
+            LLVM=1 LLVM_IAS=1 \
+            CC=clang \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip
+
+      - name: Préparer les fichiers
+        run: |
+          mkdir -p release
+          cp out/arch/arm64/boot/Image.gz release/ 2>/dev/null || true
+          cp out/arch/arm64/boot/Image.gz-dtb release/ 2>/dev/null || true
+          cp out/arch/arm64/boot/Image release/ 2>/dev/null || true
+          sha256sum release/* > release/SHA256SUMS
+
+      - name: Envoyer l’artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mojito-KernelSU-Next
+          path: release/
+          if-no-files-found: error
+        
