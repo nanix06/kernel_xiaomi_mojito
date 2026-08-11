@@ -38,7 +38,7 @@ jobs:
         run: |
           curl -LSs \
             "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" \
-            | bash -s next
+            | bash
 
       - name: Configurer le noyau
         run: |
@@ -54,13 +54,17 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             "$DEFCONFIG"
-            ./scripts/config --file out/.config --enable KSU
+
+          ./scripts/config --file out/.config --enable OVERLAY_FS
+          ./scripts/config --file out/.config --enable KSU
+
           make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
             olddefconfig
+
           grep '^CONFIG_KSU=' out/.config
             
       - name: Compiler le noyau
