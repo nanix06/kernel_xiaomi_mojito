@@ -60,7 +60,7 @@ jobs:
 
           ./scripts/config --file out/.config --enable KSU
           ./scripts/config --file out/.config --disable KSU_KPROBES_KSUD
-          ./scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "-openela-STRIX"
+          ./scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "-STRIX ❄"
 
           make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
