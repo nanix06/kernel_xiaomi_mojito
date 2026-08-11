@@ -34,9 +34,10 @@ jobs:
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi \
             clang lld llvm
+ 
       - name: Ajouter backslashxx KernelSU
         run: |
-          git clone --depth=1 --branch v3.2.5-45 \
+          git clone --depth=1 \
             https://github.com/backslashxx/KernelSU.git KernelSU
           ln -s ../KernelSU/kernel drivers/kernelsu
           printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
