@@ -67,7 +67,9 @@ jobs:
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
             olddefconfig 
-            grep '^CONFIG_KSU=' out/.config
+            grep -n 'kernelsu' Kconfig drivers/Kconfig || true
+          grep -E '^(CONFIG_(KSU|OVERLAY_FS|KPROBES|EXT4_FS)=|# CONFIG_(KSU|OVERLAY_FS|KPROBES|EXT4_FS) is not set)' out/.config || true
+          exit 1
              
       - name: Compiler le noyau
         run: |
