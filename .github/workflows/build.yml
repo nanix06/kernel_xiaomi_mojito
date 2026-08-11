@@ -10,6 +10,7 @@ env:
   ARCH: arm64
   SUBARCH: arm64
   DEFCONFIG: vendor/mojito_defconfig
+  CROSS_COMPILE: aarch64-linux-gnu-
 
 jobs:
   build:
@@ -29,7 +30,7 @@ jobs:
           sudo apt-get install -y \
             bc bison build-essential ccache flex git libssl-dev \
             libelf-dev pahole python3 rsync unzip wget zip \
-            clang lld
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: Ajouter KernelSU Next
         run: |
@@ -40,19 +41,11 @@ jobs:
       - name: Configurer le noyau
         run: |
           mkdir -p out
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 "$DEFCONFIG"
+          make O=out ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE" "$DEFCONFIG"
 
       - name: Compiler le noyau
         run: |
-          make -j"$(nproc)" O=out ARCH=arm64 \
-            LLVM=1 LLVM_IAS=1 \
-            CC=clang \
-            LD=ld.lld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip
+          make -j"$(nproc)" O=out ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE"
 
       - name: Préparer les fichiers
         run: |
