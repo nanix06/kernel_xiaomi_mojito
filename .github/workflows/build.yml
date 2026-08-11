@@ -34,12 +34,13 @@ jobs:
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi \
             clang lld llvm
-      - name: Ajouter KernelSU Next
+      - name: Ajouter backslashxx KernelSU
         run: |
-          curl -LSs \
-            "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" \
-            | bash
-            grep -q 'source "drivers/kernelsu/Kconfig"' Kconfig || echo 'source "drivers/kernelsu/Kconfig"' >> Kconfig
+          git clone --depth=1 --branch v3.2.5-45 \
+            https://github.com/backslashxx/KernelSU.git KernelSU
+          ln -s ../KernelSU/kernel drivers/kernelsu
+          printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
+          printf '\nsource "drivers/kernelsu/Kconfig"\n' >> Kconfig
 
       - name: Configurer le noyau
         run: |
@@ -56,10 +57,8 @@ jobs:
             STRIP=llvm-strip \
             "$DEFCONFIG"
 
-           ./scripts/config --file out/.config --enable OVERLAY_FS
-          ./scripts/config --file out/.config --enable KPROBES
-          ./scripts/config --file out/.config --enable EXT4_FS
-          ./scripts/config --file out/.config --enable KSU
+           ./scripts/config --file out/.config --enable KSU
+          ./scripts/config --file out/.config --disable KSU_KPROBES_KSUD
 
           make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
@@ -67,9 +66,7 @@ jobs:
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
             olddefconfig 
-            grep -n 'kernelsu' Kconfig drivers/Kconfig || true
-          grep -E '^(CONFIG_(KSU|OVERLAY_FS|KPROBES|EXT4_FS)=|# CONFIG_(KSU|OVERLAY_FS|KPROBES|EXT4_FS) is not set)' out/.config || true
-          exit 1
+            grep '^CONFIG_KSU=y$' out/.config
              
       - name: Compiler le noyau
         run: |
