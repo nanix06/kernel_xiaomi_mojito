@@ -39,6 +39,7 @@ jobs:
           curl -LSs \
             "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" \
             | bash
+            grep -q 'source "drivers/kernelsu/Kconfig"' Kconfig || echo 'source "drivers/kernelsu/Kconfig"' >> Kconfig
 
       - name: Configurer le noyau
         run: |
@@ -65,11 +66,9 @@ jobs:
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
-            olddefconfig
+            olddefconfig 
+            grep '^CONFIG_KSU=' out/.config
              
-             grep -E 'CONFIG_(KSU|OVERLAY_FS|KPROBES|EXT4_FS)' out/.config || true
-          exit 1
-            
       - name: Compiler le noyau
         run: |
           make -j"$(nproc)" O=out ARCH=arm64 \
