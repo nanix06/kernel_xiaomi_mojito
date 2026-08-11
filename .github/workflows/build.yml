@@ -54,6 +54,14 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             "$DEFCONFIG"
+            ./scripts/config --file out/.config --enable KSU
+          make O=out ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
+            CC="clang --target=aarch64-linux-gnu" \
+            LD=ld.lld \
+            olddefconfig
+          grep '^CONFIG_KSU=' out/.config
             
       - name: Compiler le noyau
         run: |
