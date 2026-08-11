@@ -1,4 +1,4 @@
-name: Mojito - KernelSU 
+name: Mojito - STRIX-KernelSU 
 
 on:
   workflow_dispatch:
@@ -60,7 +60,7 @@ jobs:
 
           ./scripts/config --file out/.config --enable KSU
           ./scripts/config --file out/.config --disable KSU_KPROBES_KSUD
-          ./scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "-openela-STRIX-KSU"
+          ./scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "-openela-STRIX"
 
           make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
@@ -94,7 +94,7 @@ jobs:
       - name: Envoyer l’artefact
         uses: actions/upload-artifact@v4
         with:
-          name: Mojito-backslashxx KernelSU
+          name: Mojito-STRIX-KernelSU
           path: release/
           if-no-files-found: error
         
