@@ -93,7 +93,7 @@ jobs:
       - name: Envoyer l’artefact
         uses: actions/upload-artifact@v4
         with:
-          name: Mojito-KernelSU-Next
+          name: Mojito-backslashxx KernelSU
           path: release/
           if-no-files-found: error
         
