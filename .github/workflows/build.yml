@@ -65,7 +65,9 @@ jobs:
             LD=ld.lld \
             olddefconfig
 
-          grep '^CONFIG_KSU=' out/.config
+          grep -n -A12 '^config KSU' KernelSU-Next/kernel/Kconfig
+          grep -E '^(CONFIG_KSU|CONFIG_OVERLAY_FS|CONFIG_KPROBES|CONFIG_KRETPROBES)=' out/.config || true
+          exit 1
             
       - name: Compiler le noyau
         run: |
