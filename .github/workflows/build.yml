@@ -1,4 +1,4 @@
-name: Mojito - KernelSU Next Build
+name: Mojito - Add backslashxx KernelSU 
 
 on:
   workflow_dispatch:
