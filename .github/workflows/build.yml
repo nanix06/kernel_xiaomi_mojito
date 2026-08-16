@@ -1,4 +1,4 @@
-name: Mojito 4.14 - KernelSU + SUSFS
+name: Mojito - STRIX-KernelSU 
 
 on:
   workflow_dispatch:
@@ -10,373 +10,43 @@ env:
   ARCH: arm64
   SUBARCH: arm64
   DEFCONFIG: vendor/mojito_defconfig
-
   CROSS_COMPILE: aarch64-linux-gnu-
   CROSS_COMPILE_COMPAT: arm-linux-gnueabi-
-
-  SUSFS_REPO: https://gitlab.com/simonpunk/susfs4ksu.git
-  SUSFS_BRANCH: kernel-4.14
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-
-      # ============================================================
-      # CHECKOUT KERNEL
-      # ============================================================
-      - name: Checkout kernel source
+      - name: Télécharger le source
         uses: actions/checkout@v4
         with:
           ref: inline-rom
           fetch-depth: 1
           submodules: recursive
 
-      # ============================================================
-      # INSTALL DEPENDENCIES
-      # ============================================================
-      - name: Install build dependencies
+      - name: Installer les dépendances
         run: |
-          set -e
-
           sudo apt-get update
-
           sudo apt-get install -y \
-            bc \
-            bison \
-            build-essential \
-            ccache \
-            flex \
-            git \
-            libssl-dev \
-            libelf-dev \
-            pahole \
-            python3 \
-            rsync \
-            unzip \
-            wget \
-            zip \
-            patch \
-            gcc-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu \
-            gcc-arm-linux-gnueabi \
-            binutils-arm-linux-gnueabi \
-            clang \
-            lld \
-            llvm
-
-      # ============================================================
-      # CHECK LOCAL KERNELSU
-      # ============================================================
-      - name: Check local KernelSU
+            bc bison build-essential ccache flex git libssl-dev \
+            libelf-dev pahole python3 rsync unzip wget zip \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi \
+            clang lld llvm
+ 
+      - name: Ajouter backslashxx KernelSU
         run: |
-          set -e
+          git clone --depth=1 \
+            https://github.com/backslashxx/KernelSU.git KernelSU
+          ln -s ../KernelSU/kernel drivers/kernelsu
+          printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
+          printf '\nsource "drivers/kernelsu/Kconfig"\n' >> Kconfig
 
-          echo "================================================"
-          echo "Recherche de KernelSU local"
-          echo "================================================"
-
-          if [ -d "drivers/KernelSU" ]; then
-            echo "OK: drivers/KernelSU existe"
-          else
-            echo "ERREUR: drivers/KernelSU introuvable"
-            echo
-            echo "Contenu de drivers/:"
-            ls -la drivers/
-            exit 1
-          fi
-
-          echo
-          echo "Contenu de drivers/KernelSU:"
-          ls -la drivers/KernelSU/
-
-      # ============================================================
-      # DETECT KERNELSU ROOT
-      # ============================================================
-      - name: Detect KernelSU layout
+      - name: Configurer le noyau
         run: |
-          set -e
-
-          echo "================================================"
-          echo "Détection de l'arborescence KernelSU"
-          echo "================================================"
-
-          if [ -d "drivers/KernelSU/kernel" ] && \
-             [ -f "drivers/KernelSU/kernel/Kconfig" ]; then
-
-            echo "KernelSU complet détecté:"
-            echo "  drivers/KernelSU/kernel"
-
-            echo "KSU_ROOT=drivers/KernelSU" >> "$GITHUB_ENV"
-            echo "KSU_KERNEL=drivers/KernelSU/kernel" >> "$GITHUB_ENV"
-
-          elif [ -f "drivers/KernelSU/Kconfig" ]; then
-
-            echo "KernelSU intégré directement dans:"
-            echo "  drivers/KernelSU"
-
-            echo "KSU_ROOT=drivers/KernelSU" >> "$GITHUB_ENV"
-            echo "KSU_KERNEL=drivers/KernelSU" >> "$GITHUB_ENV"
-
-          else
-
-            echo "ERREUR: impossible de déterminer la structure de KernelSU"
-            echo
-            find drivers/KernelSU -maxdepth 3 -type f \
-              \( -name "Kconfig" -o -name "Makefile" \) \
-              -print
-            exit 1
-
-          fi
-
-          echo
-          echo "KSU_ROOT=$KSU_ROOT"
-          echo "KSU_KERNEL=$KSU_KERNEL"
-
-      # ============================================================
-      # CHECK KERNELSU INTEGRATION
-      # ============================================================
-      - name: Check KernelSU integration
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Vérification de l'intégration KernelSU"
-          echo "================================================"
-
-          echo
-          echo "--- drivers/Makefile ---"
-
-          grep -n "KernelSU\|kernelsu" drivers/Makefile || true
-
-          echo
-          echo "--- Kconfig ---"
-
-          grep -n "KernelSU\|kernelsu" Kconfig || true
-
-          echo
-          echo "--- KernelSU Kconfig ---"
-
-          if [ -f "$KSU_KERNEL/Kconfig" ]; then
-            grep -n "config KSU" "$KSU_KERNEL/Kconfig" || true
-          fi
-
-      # ============================================================
-      # CLONE SUSFS PATCHES ONLY
-      # ============================================================
-      - name: Download SUSFS kernel-4.14 patches
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Téléchargement SUSFS"
-          echo "================================================"
-
-          rm -rf susfs4ksu
-
-          git clone \
-            --depth=1 \
-            --branch "$SUSFS_BRANCH" \
-            "$SUSFS_REPO" \
-            susfs4ksu
-
-          echo
-          echo "Commit SUSFS utilisé:"
-          git -C susfs4ksu rev-parse HEAD
-
-          echo
-          echo "Vérification des fichiers..."
-
-          test -f \
-            susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-
-          test -f \
-            susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch
-
-          test -f \
-            susfs4ksu/kernel_patches/fs/susfs.c
-
-          test -f \
-            susfs4ksu/kernel_patches/include/linux/susfs.h
-
-          echo "Tous les fichiers SUSFS sont présents."
-
-      # ============================================================
-      # COPY SUSFS FILES
-      # ============================================================
-      - name: Install SUSFS kernel files
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Installation des fichiers SUSFS"
-          echo "================================================"
-
-          mkdir -p fs
-          mkdir -p include/linux
-
-          # Les fichiers officiels SUSFS remplacent ceux déjà copiés
-          # dans la source afin d'avoir exactement la version associée
-          # au patch kernel-4.14.
-          cp -f \
-            susfs4ksu/kernel_patches/fs/susfs.c \
-            fs/susfs.c
-
-          cp -f \
-            susfs4ksu/kernel_patches/include/linux/susfs.h \
-            include/linux/susfs.h
-
-          echo
-          echo "susfs.c:"
-          ls -lh fs/susfs.c
-
-          echo
-          echo "susfs.h:"
-          ls -lh include/linux/susfs.h
-
-      # ============================================================
-      # INSTALL SUSFS PATCHES
-      # ============================================================
-      - name: Apply SUSFS patches
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Application des patches SUSFS"
-          echo "================================================"
-
-          # ----------------------------------------------------------
-          # 1. Patch KernelSU
-          # ----------------------------------------------------------
-          echo
-          echo ">>> Patch KernelSU"
-
-          cp -f \
-            susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch \
-            "$KSU_ROOT/10_enable_susfs_for_ksu.patch"
-
-          cd "$KSU_ROOT"
-
-          echo "KernelSU directory:"
-          pwd
-
-          patch -p1 \
-            --forward \
-            < 10_enable_susfs_for_ksu.patch
-
-          rm -f 10_enable_susfs_for_ksu.patch
-
-          cd "$GITHUB_WORKSPACE"
-
-          # ----------------------------------------------------------
-          # 2. Patch kernel 4.14
-          # ----------------------------------------------------------
-          echo
-          echo ">>> Patch kernel 4.14"
-
-          cp -f \
-            susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch \
-            ./50_add_susfs_in_kernel-4.14.patch
-
-          patch -p1 \
-            --forward \
-            < 50_add_susfs_in_kernel-4.14.patch
-
-          rm -f 50_add_susfs_in_kernel-4.14.patch
-
-          echo
-          echo "================================================"
-          echo "SUSFS appliqué avec succès"
-          echo "================================================"
-
-      # ============================================================
-      # VERIFY SUSFS IN SOURCE
-      # ============================================================
-      - name: Verify SUSFS integration
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Vérification SUSFS"
-          echo "================================================"
-
-          test -f fs/susfs.c
-          test -f include/linux/susfs.h
-
-          echo
-          echo "SUSFS version:"
-          grep "SUSFS_VERSION" include/linux/susfs.h || true
-
-          echo
-          echo "Recherche CONFIG_KSU_SUSFS dans KernelSU:"
-
-          grep -R \
-            "config KSU_SUSFS" \
-            "$KSU_KERNEL" \
-            --include="Kconfig" \
-            || true
-
-      # ============================================================
-      # VERIFY KERNELSU DRIVER ENTRY
-      # ============================================================
-      - name: Verify KernelSU driver entry
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Vérification drivers/Makefile"
-          echo "================================================"
-
-          grep -nE \
-            'obj-\$\(CONFIG_KSU\).*KernelSU|obj-\$\(CONFIG_KSU\).*kernelsu' \
-            drivers/Makefile \
-            || true
-
-          echo
-          echo "Si aucune entrée n'est affichée, vérification manuelle:"
-          echo
-
-          grep -n "CONFIG_KSU" drivers/Makefile || true
-
-      # ============================================================
-      # CHECK DEFCONFIG
-      # ============================================================
-      - name: Check mojito defconfig
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Vérification mojito_defconfig"
-          echo "================================================"
-
-          test -f "$DEFCONFIG"
-
-          echo
-          echo "CONFIG_KSU:"
-          grep -n "^CONFIG_KSU" "$DEFCONFIG" || true
-
-          echo
-          echo "SUSFS:"
-          grep -n "KSU_SUSFS" "$DEFCONFIG" || true
-
-      # ============================================================
-      # CONFIGURE KERNEL
-      # ============================================================
-      - name: Configure kernel
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Configuration du kernel"
-          echo "================================================"
-
-          rm -rf out
           mkdir -p out
-
-          make \
-            O=out \
-            ARCH="$ARCH" \
+          make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
             CC="clang --target=aarch64-linux-gnu" \
@@ -388,87 +58,21 @@ jobs:
             STRIP=llvm-strip \
             "$DEFCONFIG"
 
-          echo
-          echo "Application de olddefconfig..."
+          ./scripts/config --file out/.config --enable KSU
+          ./scripts/config --file out/.config --disable KSU_KPROBES_KSUD
+          ./scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "-STRIX-Kernel"
 
-          make \
-            O=out \
-            ARCH="$ARCH" \
+          make O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
             CC="clang --target=aarch64-linux-gnu" \
             LD=ld.lld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
-            olddefconfig
-
-      # ============================================================
-      # FORCE / VERIFY KSU + SUSFS
-      # ============================================================
-      - name: Verify final kernel configuration
+            olddefconfig 
+            grep '^CONFIG_KSU=y$' out/.config
+             
+      - name: Compiler le noyau
         run: |
-          set -e
-
-          echo "================================================"
-          echo "Configuration finale"
-          echo "================================================"
-
-          echo
-          echo "KernelSU:"
-          grep -E \
-            '^CONFIG_KSU=' \
-            out/.config \
-            || true
-
-          echo
-          echo "KernelSU SUSFS:"
-          grep -E \
-            '^CONFIG_KSU_SUSFS=' \
-            out/.config \
-            || true
-
-          echo
-          echo "Toutes les options SUSFS:"
-          grep -E \
-            '^CONFIG_KSU_SUSFS' \
-            out/.config \
-            || true
-
-          echo
-          echo "Vérification obligatoire..."
-
-          if ! grep -q '^CONFIG_KSU=y$' out/.config; then
-            echo "ERREUR: CONFIG_KSU=y absent"
-            exit 1
-          fi
-
-          if ! grep -q '^CONFIG_KSU_SUSFS=y$' out/.config; then
-            echo "ERREUR: CONFIG_KSU_SUSFS=y absent"
-            exit 1
-          fi
-
-          echo
-          echo "CONFIG_KSU=y : OK"
-          echo "CONFIG_KSU_SUSFS=y : OK"
-
-      # ============================================================
-      # BUILD KERNEL
-      # ============================================================
-      - name: Build kernel
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Compilation du kernel"
-          echo "================================================"
-
-          make \
-            -j"$(nproc)" \
-            O=out \
-            ARCH="$ARCH" \
+          make -j"$(nproc)" O=out ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
             CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
             CC="clang --target=aarch64-linux-gnu" \
@@ -479,227 +83,18 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip
 
-      # ============================================================
-      # SHOW BUILD OUTPUT
-      # ============================================================
-      - name: Show kernel output
+      - name: Préparer les fichiers
         run: |
-          set -e
-
-          echo "================================================"
-          echo "Fichiers générés"
-          echo "================================================"
-
-          find out/arch/arm64/boot \
-            -type f \
-            -print \
-            | sort
-
-      # ============================================================
-      # COLLECT ALL IMAGES
-      # ============================================================
-      - name: Collect all kernel images
-        run: |
-          set -e
-
-          echo "================================================"
-          echo "Collecte des images"
-          echo "================================================"
-
-          rm -rf release
           mkdir -p release
-          mkdir -p release/dtb
-          mkdir -p release/dts
+          cp out/arch/arm64/boot/Image.gz release/ 2>/dev/null || true
+          cp out/arch/arm64/boot/Image.gz-dtb release/ 2>/dev/null || true
+          cp out/arch/arm64/boot/Image release/ 2>/dev/null || true
+          sha256sum release/* > release/SHA256SUMS
 
-          # ----------------------------------------------------------
-          # Kernel images
-          # ----------------------------------------------------------
-
-          for file in \
-            Image \
-            Image.gz \
-            Image.gz-dtb \
-            Image.lz4 \
-            Image.gz.lz4 \
-            Image-dtb \
-            Image.gz-dtb.lz4
-          do
-            if [ -f "out/arch/arm64/boot/$file" ]; then
-              echo "COPY: $file"
-              cp "out/arch/arm64/boot/$file" release/
-            fi
-          done
-
-          # ----------------------------------------------------------
-          # dtbo.img
-          # ----------------------------------------------------------
-
-          if [ -f "out/arch/arm64/boot/dtbo.img" ]; then
-            echo "COPY: dtbo.img"
-            cp out/arch/arm64/boot/dtbo.img release/
-          fi
-
-          # ----------------------------------------------------------
-          # DTB files
-          # ----------------------------------------------------------
-
-          if [ -d "out/arch/arm64/boot/dts" ]; then
-
-            find out/arch/arm64/boot/dts \
-              -type f \
-              -name "*.dtb" \
-              -exec cp {} release/dtb/ \;
-
-          fi
-
-          # ----------------------------------------------------------
-          # DTBO files éventuellement générés
-          # ----------------------------------------------------------
-
-          find out/arch/arm64/boot \
-            -type f \
-            \( \
-              -name "*.dtbo" \
-              -o -name "*.dtb" \
-            \) \
-            -exec cp {} release/dtb/ \; \
-            || true
-
-          # ----------------------------------------------------------
-          # Autres fichiers .img dans boot/
-          # ----------------------------------------------------------
-
-          find out/arch/arm64/boot \
-            -maxdepth 1 \
-            -type f \
-            -name "*.img" \
-            -exec cp {} release/ \; \
-            || true
-
-          # ----------------------------------------------------------
-          # Kernel config
-          # ----------------------------------------------------------
-
-          cp out/.config release/kernel.config
-
-          # ----------------------------------------------------------
-          # Build information
-          # ----------------------------------------------------------
-
-          {
-            echo "Kernel: Xiaomi mojito"
-            echo "Kernel version:"
-            make O=out kernelversion
-            echo
-            echo "KernelSU:"
-            grep '^CONFIG_KSU=' out/.config || true
-            echo
-            echo "SUSFS:"
-            grep '^CONFIG_KSU_SUSFS=' out/.config || true
-            echo
-            echo "SUSFS version:"
-            grep 'SUSFS_VERSION' include/linux/susfs.h || true
-            echo
-            echo "SUSFS commit:"
-            git -C susfs4ksu rev-parse HEAD
-          } > release/BUILD_INFO.txt
-
-          # ----------------------------------------------------------
-          # Vérification image kernel
-          # ----------------------------------------------------------
-
-          if ! find release -maxdepth 1 -type f \
-            \( \
-              -name "Image" \
-              -o -name "Image.gz" \
-              -o -name "Image.gz-dtb" \
-              -o -name "Image.lz4" \
-              -o -name "Image.gz.lz4" \
-              -o -name "Image-dtb" \
-            \) \
-            | grep -q .
-          then
-            echo "ERREUR: aucune image kernel trouvée dans release/"
-            exit 1
-          fi
-
-          echo
-          echo "================================================"
-          echo "CONTENU RELEASE"
-          echo "================================================"
-
-          find release \
-            -type f \
-            -print \
-            | sort
-
-      # ============================================================
-      # CREATE CHECKSUMS
-      # ============================================================
-      - name: Create SHA256 checksums
-        run: |
-          set -e
-
-          cd release
-
-          find . \
-            -type f \
-            ! -name "SHA256SUMS" \
-            -print0 \
-            | sort -z \
-            | xargs -0 sha256sum \
-            > SHA256SUMS
-
-          cd ..
-
-          echo "SHA256SUMS:"
-          cat release/SHA256SUMS
-
-      # ============================================================
-      # CREATE FINAL ZIP
-      # ============================================================
-      - name: Create final ZIP
-        run: |
-          set -e
-
-          VERSION="$(date '+%Y%m%d-%H%M')"
-
-          ZIP_NAME="Mojito-KernelSU-SUSFS-${VERSION}.zip"
-
-          echo "================================================"
-          echo "Création du ZIP final"
-          echo "================================================"
-
-          echo "ZIP: $ZIP_NAME"
-
-          cd release
-
-          zip -r9 \
-            "../$ZIP_NAME" \
-            .
-
-          cd ..
-
-          echo
-          echo "================================================"
-          echo "ZIP FINAL"
-          echo "================================================"
-
-          ls -lh "$ZIP_NAME"
-
-          echo
-          echo "Contenu:"
-          unzip -l "$ZIP_NAME"
-
-          echo
-          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
-
-      # ============================================================
-      # UPLOAD FINAL ZIP
-      # ============================================================
-      - name: Upload final ZIP
+      - name: Envoyer l’artefact
         uses: actions/upload-artifact@v4
         with:
-          name: Mojito-KernelSU-SUSFS
-          path: "*.zip"
+          name: Mojito-STRIX-KernelSU
+          path: release/
           if-no-files-found: error
+        
