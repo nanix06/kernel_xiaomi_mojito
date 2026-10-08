@@ -57,7 +57,6 @@ jobs:
           bash patches/Patches/Fix/fix_sepolicy_mojito.sh KernelSU
 
           printf '%s\n' \
-            '#define KSU_TYPE_VAL_TO_STRUCT' \
             '#include "ss/avtab.h"' \
             '#include "ss/constraint.h"' \
             '#include "ss/ebitmap.h"' \
